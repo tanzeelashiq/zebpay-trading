@@ -24,7 +24,7 @@ async def webhook(request: Request):
     return {
         "status": "ok",
         "tv_symbol": tv_symbol,
-        "mapped_symbol": zebpay_symbol,
+        "mapped_symbol": inr_symbol,
         "signal": data.get("signal"),
         "price": data.get("price"),
         "order_id": data.get("order_id")
