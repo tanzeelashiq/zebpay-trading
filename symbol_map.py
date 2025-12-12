@@ -1,0 +1,18 @@
+SYMBOL_MAP = {
+    "BTCUSDT": "BTCINR",
+    "ETHUSDT": "ETHINR",
+    "BNBUSDT": "BNBINR",
+    "SOLUSDT": "SOLINR",
+    "XRPUSDT": "XRPINR",
+    "ADAUSDT": "ADAINR",
+    "AVAXUSDT": "AVAXINR",
+    "DOTUSDT": "DOTINR",
+    "LINKUSDT": "LINKINR",
+    "UNIUSDT": "UNINR",
+    "ATOMUSDT": "ATOMINR",
+    "AAVEUSDT": "AAVEINR",
+    "FETUSDT": "FETINR",
+    "APTUSDT": "APTINR",
+    "SUIUSDT": "SUIINR",
+    "POLUSDT": "POLINR"
+}
