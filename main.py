@@ -21,7 +21,15 @@ async def webhook(request: Request):
         return {"status": "error", "reason": "symbol not mapped"}
 
     # Later: send order to ZebPay here
-    return {"status": "ok", "mapped_symbol": inr_symbol}
+    return {
+        "status": "ok",
+        "tv_symbol": tv_symbol,
+        "mapped_symbol": zebpay_symbol,
+        "signal": data.get("signal"),
+        "price": data.get("price"),
+        "order_id": data.get("order_id")
+    }
+
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000)
