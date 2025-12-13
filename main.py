@@ -3,6 +3,9 @@ from symbol_map import SYMBOL_MAP
 import uvicorn
 
 app = FastAPI()
+@app.get("/")
+def health():
+    return {"status": "alive"}
 
 @app.post("/webhook")
 async def webhook(request: Request):
