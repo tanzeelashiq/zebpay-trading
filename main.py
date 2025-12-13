@@ -3,6 +3,13 @@ from symbol_map import SYMBOL_MAP
 import uvicorn
 
 app = FastAPI()
+
+@app.api_route("/probe", methods=["GET", "POST"])
+async def probe(request: Request):
+    return {
+        "method": request.method
+    }
+    
 @app.get("/")
 def health():
     return {"status": "alive"}
