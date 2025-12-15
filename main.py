@@ -1,44 +1,62 @@
 from fastapi import FastAPI, Request
 from symbol_map import SYMBOL_MAP
+from zebpay import place_market_order
+from config import TRADE_AMOUNT_INR, ALLOWED_SYMBOLS, ENABLE_TRADING
 import uvicorn
 
 app = FastAPI()
 
-@app.api_route("/probe", methods=["GET", "POST"])
-async def probe(request: Request):
-    return {
-        "method": request.method
-    }
-    
-@app.get("/")
-def health():
-    return {"status": "alive"}
 
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
-    print("Received alert:", data)
+    print("📩 Received alert:", data)
 
-    tv_symbol = data.get("symbol")      # e.g. BTCUSDT
-    signal = data.get("signal")         # BUY or SELL
+    tv_symbol = data.get("symbol")          # BTCUSDT
+    signal = data.get("signal")             # BUY / SELL
 
-    inr_symbol = SYMBOL_MAP.get(tv_symbol)
+    if not tv_symbol or not signal:
+        return {"status": "error", "reason": "invalid alert payload"}
 
-    print(f"Mapped {tv_symbol} → {inr_symbol}")
+    zebpay_symbol = SYMBOL_MAP.get(tv_symbol)
 
-    # If coin not found, do nothing
-    if inr_symbol is None:
-        return {"status": "error", "reason": "symbol not mapped"}
+    if zebpay_symbol is None:
+        return {"status": "ignored", "reason": "symbol not mapped"}
 
-    # Later: send order to ZebPay here
+    if zebpay_symbol not in ALLOWED_SYMBOLS:
+        return {"status": "ignored", "reason": "symbol not allowed"}
+
+    if signal not in ["BUY", "SELL"]:
+        return {"status": "ignored", "reason": "invalid signal"}
+
+    if not ENABLE_TRADING:
+        print("🚫 Trading disabled by config")
+        return {"status": "blocked", "reason": "trading disabled"}
+
+    print(f"⚡ Executing {signal} for {zebpay_symbol} (₹{TRADE_AMOUNT_INR})")
+
+    status_code, response = place_market_order(
+        symbol=zebpay_symbol,
+        side=signal,
+        amount_inr=TRADE_AMOUNT_INR
+    )
+
+    print("📊 ZebPay response:", response)
+
     return {
         "status": "ok",
+        "signal": signal,
         "tv_symbol": tv_symbol,
-        "mapped_symbol": inr_symbol,
-        "signal": data.get("signal"),
-        "price": data.get("price"),
-        "order_id": data.get("order_id")
+        "zebpay_symbol": zebpay_symbol,
+        "amount_inr": TRADE_AMOUNT_INR,
+        "zebpay_status": status_code,
+        "zebpay_response": response
     }
+
+
+@app.get("/")
+def health():
+    return {"status": "alive"}
 
 
 if __name__ == "__main__":
