@@ -9,6 +9,8 @@ ZEBPAY_BASE_URL = "https://www.zebpay.com/api/v1"
 API_KEY = os.getenv("ZEBPAY_API_KEY")
 API_SECRET = os.getenv("ZEBPAY_API_SECRET")
 
+if not API_KEY or not API_SECRET:
+    raise RuntimeError("ZEBPAY API key or secret not set in environment")
 
 def _sign(payload: str):
     return hmac.new(
