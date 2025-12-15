@@ -51,4 +51,9 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
 
     response = requests.post(url, json=body, headers=headers, timeout=10)
 
-    return response.status_code, response.json()
+    try:
+        data = response.json()
+    except Exception:
+        data = response.text
+    return response.status_code, data
+
