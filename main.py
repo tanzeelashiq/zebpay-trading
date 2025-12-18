@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from symbol_map import SYMBOL_MAP
-from zebpay import place_market_order
+from coindcx import place_market_order
 from config import TRADE_AMOUNT_INR, ALLOWED_SYMBOLS, ENABLE_TRADING
 import uvicorn
 
