@@ -16,7 +16,7 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
 
     body = {
         "side": "buy",
-        "order_type": "market_order",
+        "order_type": "market",
         "market": symbol,
         "total_price": amount_inr,
         "timestamp": int(time.time() * 1000)
