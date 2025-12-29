@@ -15,19 +15,21 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
+    timestamp = int(time.time() * 1000)
+
     body = {
         "side": side.lower(),           # buy / sell
         "order_type": "market",
         "market": symbol,               # I-BTC_INR
         "total_quantity": amount_inr,   # INR amount
-        "timestamp": int(time.time() * 1000)
+        "timestamp": timestamp
     }
 
-    body_json = json.dumps(body, separators=(',', ':'))
+    body_json = json.dumps(body, separators=(',', ':'), ensure_ascii=False)
 
     signature = hmac.new(
-        API_SECRET.encode(),
-        body_json.encode(),
+        API_SECRET.encode("utf-8"),
+        body_json.encode("utf-8"),
         hashlib.sha256
     ).hexdigest()
 
@@ -37,7 +39,12 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
         "Content-Type": "application/json"
     }
 
-    response = requests.post(url, data=body_json, headers=headers, timeout=10)
+    response = requests.post(
+        url,
+        data=body_json,
+        headers=headers,
+        timeout=15
+    )
 
     try:
         return response.status_code, response.json()
