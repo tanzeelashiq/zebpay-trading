@@ -38,13 +38,18 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
         "X-AUTH-SIGNATURE": signature,
         "Content-Type": "application/json"
     }
-
+    print("📤 COINDCX REQUEST BODY:", body_json)
+    print("📤 COINDCX HEADERS:", headers)
+    
     response = requests.post(
         url,
         data=body_json,
         headers=headers,
         timeout=15
     )
+    
+    print("📥 COINDCX STATUS:", response.status_code)
+    print("📥 COINDCX RAW RESPONSE:", response.text)
 
     try:
         return response.status_code, response.json()
