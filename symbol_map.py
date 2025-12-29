@@ -1,5 +1,5 @@
 SYMBOL_MAP = {
-    "BTCUSDT": "I-BTC_INR",
+    "BTCUSDT": "BTCINR",
     "ETHUSDT": "ETHINR",
     "BNBUSDT": "BNBINR",
     "SOLUSDT": "SOLINR",
