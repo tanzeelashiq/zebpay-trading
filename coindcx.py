@@ -21,7 +21,7 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
         "side": side.lower(),           # buy / sell
         "order_type": "market_order",
         "market": symbol,               # I-BTC_INR
-        "total_quantity": amount_inr,   # INR amount
+        "total_price": amount_inr,   # INR amount
         "timestamp": timestamp
     }
 
