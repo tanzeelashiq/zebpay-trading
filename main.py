@@ -41,7 +41,7 @@ async def webhook(request: Request):
         amount_inr=TRADE_AMOUNT_INR
     )
 
-    print("📊 ZebPay response:", response)
+    print("📊 CoinDCX response:", response)
 
     return {
         "status": "ok",
