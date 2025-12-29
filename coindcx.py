@@ -8,28 +8,25 @@ import os
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET")
+API_SECRET = os.getenv("COINDCX_API_SECRET").encode()
 
-def place_market_order(symbol: str, side: str, amount_inr: int):
-
+def place_market_buy_inr(symbol: str, amount_inr: int):
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
-    timestamp = int(time.time() * 1000)
-
     body = {
-        "side": side.lower(),           # buy / sell
-        "order_type": "market_order",
-        "market": symbol,               # I-BTC_INR
-        "total_price": amount_inr,   # INR amount
-        "timestamp": timestamp
+        "side": "buy",
+        "order_type": "market",
+        "market": symbol,
+        "total_price": amount_inr,
+        "timestamp": int(time.time() * 1000)
     }
 
-    body_json = json.dumps(body, separators=(',', ':'), ensure_ascii=False)
+    body_json = json.dumps(body, separators=(",", ":"))
 
     signature = hmac.new(
-        API_SECRET.encode("utf-8"),
-        body_json.encode("utf-8"),
+        API_SECRET,
+        body_json.encode(),
         hashlib.sha256
     ).hexdigest()
 
@@ -38,20 +35,14 @@ def place_market_order(symbol: str, side: str, amount_inr: int):
         "X-AUTH-SIGNATURE": signature,
         "Content-Type": "application/json"
     }
+
     print("📤 COINDCX REQUEST BODY:", body_json)
-    print("📤 COINDCX HEADERS:", headers)
-    
-    response = requests.post(
-        url,
-        data=body_json,
-        headers=headers,
-        timeout=15
-    )
-    
-    print("📥 COINDCX STATUS:", response.status_code)
-    print("📥 COINDCX RAW RESPONSE:", response.text)
+
+    response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
     try:
-        return response.status_code, response.json()
+        data = response.json()
     except Exception:
-        return response.status_code, response.text
+        data = response.text
+
+    return response.status_code, data
