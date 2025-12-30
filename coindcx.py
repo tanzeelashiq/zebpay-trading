@@ -4,7 +4,6 @@ import hashlib
 import json
 import requests
 import os
-import uuid
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
@@ -12,22 +11,23 @@ API_KEY = os.getenv("COINDCX_API_KEY")
 API_SECRET = os.getenv("COINDCX_API_SECRET")
 
 if not API_KEY or not API_SECRET:
-    raise RuntimeError("CoinDCX API credentials not set")
+    raise RuntimeError("CoinDCX API credentials missing")
+
 
 def place_market_buy_inr(symbol: str, amount_inr: int):
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
     body = {
+        "market": symbol,
         "side": "buy",
-        "order_type": "market_order",      # ✅ FIXED
-        "market": symbol,                  # e.g. BTCINR
-        "total_price": amount_inr,          # ₹200
-        "client_order_id": f"tv-{uuid.uuid4().hex[:12]}",
+        "order_type": "market",
+        "total_price": amount_inr,
         "timestamp": int(time.time() * 1000)
     }
 
-    body_json = json.dumps(body, separators=(",", ":"))
+    # ✅ Canonical JSON (key order preserved)
+    body_json = json.dumps(body, separators=(",", ":"), sort_keys=True)
 
     signature = hmac.new(
         API_SECRET.encode(),
@@ -41,22 +41,14 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "Content-Type": "application/json"
     }
 
-    print("📤 COINDCX REQUEST BODY:", body_json)
-    print("📤 COINDCX HEADERS:", headers)
+    print("📤 COINDCX BODY:", body_json)
+    print("📤 COINDCX SIGNATURE:", signature)
 
-    response = requests.post(
-        url,
-        headers=headers,
-        json=body,            # ✅ FIXED (NOT data=)
-        timeout=15
-    )
+    response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
     try:
         data = response.json()
     except Exception:
         data = response.text
-
-    print("📥 COINDCX STATUS:", response.status_code)
-    print("📥 COINDCX RESPONSE:", data)
 
     return response.status_code, data
