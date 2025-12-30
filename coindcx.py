@@ -5,13 +5,14 @@ import json
 import requests
 import os
 
-COINDCX_BASE_URL = "https://api.coindcx.com/exchange"
+COINDCX_PUBLIC_URL = "https://api.coindcx.com"
+COINDCX_TRADE_URL = "https://api.coindcx.com/exchange"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
 API_SECRET = os.getenv("COINDCX_API_SECRET")
 
 def get_last_price(symbol: str) -> float:
-    url = f"{COINDCX_BASE_URL}/ticker"
+    url = f"{COINDCX_PUBLIC_URL}/exchange/ticker"
     r = requests.get(url, timeout=10)
     data = r.json()
 
@@ -20,6 +21,7 @@ def get_last_price(symbol: str) -> float:
             return float(item["last_price"])
 
     raise RuntimeError(f"Price not found for {symbol}")
+
 
 
 def place_market_buy_inr(symbol: str, amount_inr: int):
@@ -31,7 +33,7 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         raise RuntimeError(f"Quantity too small: {quantity}")
 
     endpoint = "/v1/orders/create"
-    url = COINDCX_BASE_URL + endpoint
+    url = COINDCX_TRADE_URL + "/v1/orders/create"
 
     body = {
         "market": symbol,
