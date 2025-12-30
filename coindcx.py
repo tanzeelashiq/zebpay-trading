@@ -14,7 +14,26 @@ if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API credentials missing")
 
 
+def get_last_price(symbol: str) -> float:
+    url = f"{COINDCX_BASE_URL}/exchange/ticker"
+    r = requests.get(url, timeout=10)
+    data = r.json()
+
+    for item in data:
+        if item["market"] == symbol:
+            return float(item["last_price"])
+
+    raise RuntimeError(f"Price not found for {symbol}")
+
+
 def place_market_buy_inr(symbol: str, amount_inr: int):
+    last_price = get_last_price(symbol)
+
+    quantity = round(amount_inr / last_price, 6)
+
+    if quantity <= 0:
+        raise RuntimeError("Calculated quantity is zero")
+
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
@@ -22,11 +41,10 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "market": symbol,
         "side": "buy",
         "order_type": "market",
-        "total_price": amount_inr,
+        "quantity": quantity,
         "timestamp": int(time.time() * 1000)
     }
 
-    # ✅ Canonical JSON (key order preserved)
     body_json = json.dumps(body, separators=(",", ":"), sort_keys=True)
 
     signature = hmac.new(
@@ -41,8 +59,9 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "Content-Type": "application/json"
     }
 
-    print("📤 COINDCX BODY:", body_json)
-    print("📤 COINDCX SIGNATURE:", signature)
+    print(f"📈 Price: {last_price}")
+    print(f"📦 Quantity: {quantity}")
+    print("📤 BODY:", body_json)
 
     response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
