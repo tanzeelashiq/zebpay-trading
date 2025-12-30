@@ -5,17 +5,13 @@ import json
 import requests
 import os
 
-COINDCX_BASE_URL = "https://api.coindcx.com"
+COINDCX_BASE_URL = "https://api.coindcx.com/exchange"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
 API_SECRET = os.getenv("COINDCX_API_SECRET")
 
-if not API_KEY or not API_SECRET:
-    raise RuntimeError("CoinDCX API credentials missing")
-
-
 def get_last_price(symbol: str) -> float:
-    url = f"{COINDCX_BASE_URL}/exchange/ticker"
+    url = f"{COINDCX_BASE_URL}/ticker"
     r = requests.get(url, timeout=10)
     data = r.json()
 
@@ -29,12 +25,12 @@ def get_last_price(symbol: str) -> float:
 def place_market_buy_inr(symbol: str, amount_inr: int):
     last_price = get_last_price(symbol)
 
-    quantity = round(amount_inr / last_price, 6)
+    quantity = round(amount_inr / last_price, 5)
 
-    if quantity <= 0:
-        raise RuntimeError("Calculated quantity is zero")
+    if quantity < 0.0001:
+        raise RuntimeError(f"Quantity too small: {quantity}")
 
-    endpoint = "/exchange/v1/orders/create"
+    endpoint = "/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
     body = {
@@ -59,9 +55,11 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "Content-Type": "application/json"
     }
 
-    print(f"📈 Price: {last_price}")
-    print(f"📦 Quantity: {quantity}")
-    print("📤 BODY:", body_json)
+    print("🧪 FINAL DEBUG")
+    print("SYMBOL:", symbol)
+    print("PRICE:", last_price)
+    print("QTY:", quantity)
+    print("BODY:", body_json)
 
     response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
