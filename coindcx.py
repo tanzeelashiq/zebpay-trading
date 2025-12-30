@@ -27,31 +27,22 @@ def get_last_price(symbol: str) -> float:
 
     raise RuntimeError(f"Price not found for {symbol}")
 
-
-
 def place_market_buy_inr(symbol: str, amount_inr: int):
-    last_price = get_last_price(symbol)
-
-    quantity = round(amount_inr / last_price, 5)
-
-    if quantity < 0.0001:
-        raise RuntimeError(f"Quantity too small: {quantity}")
-
-    endpoint = "/v1/orders/create"
-    url = COINDCX_TRADE_URL + "/v1/orders/create"
+    endpoint = "/exchange/v1/orders/create"
+    url = COINDCX_BASE_URL + endpoint
 
     body = {
-        "market": symbol,
         "side": "buy",
         "order_type": "market",
-        "quantity": quantity,
+        "market": symbol,
+        "total_price": amount_inr,   # 🔥 THIS is the key
         "timestamp": int(time.time() * 1000)
     }
 
-    body_json = json.dumps(body, separators=(",", ":"), sort_keys=True)
+    body_json = json.dumps(body, separators=(",", ":"))
 
     signature = hmac.new(
-        API_SECRET.encode(),
+        API_SECRET,
         body_json.encode(),
         hashlib.sha256
     ).hexdigest()
@@ -62,11 +53,7 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "Content-Type": "application/json"
     }
 
-    print("🧪 FINAL DEBUG")
-    print("SYMBOL:", symbol)
-    print("PRICE:", last_price)
-    print("QTY:", quantity)
-    print("BODY:", body_json)
+    print("📤 COINDCX REQUEST BODY:", body_json)
 
     response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
