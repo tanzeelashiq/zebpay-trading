@@ -9,7 +9,12 @@ COINDCX_PUBLIC_URL = "https://api.coindcx.com"
 COINDCX_TRADE_URL = "https://api.coindcx.com/exchange"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET")
+API_SECRET_RAW = os.getenv("COINDCX_API_SECRET")
+
+if not API_KEY or not API_SECRET_RAW:
+    raise RuntimeError("CoinDCX API credentials not set")
+
+API_SECRET = API_SECRET_RAW.encode()
 
 def get_last_price(symbol: str) -> float:
     url = f"{COINDCX_PUBLIC_URL}/exchange/ticker"
