@@ -4,30 +4,30 @@ import hashlib
 import json
 import requests
 import os
+from decimal import Decimal, ROUND_DOWN
 
-COINDCX_PUBLIC_URL = "https://api.coindcx.com"
-COINDCX_TRADE_URL = "https://api.coindcx.com/exchange"
+COINDCX_BASE_URL = "https://api.coindcx.com"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET_RAW = os.getenv("COINDCX_API_SECRET")
+API_SECRET = os.getenv("COINDCX_API_SECRET")
 
-if not API_KEY or not API_SECRET_RAW:
-    raise RuntimeError("CoinDCX API credentials not set")
+if not API_KEY or not API_SECRET:
+    raise RuntimeError("CoinDCX API keys not set")
 
-API_SECRET = API_SECRET_RAW.encode()
 
-def get_last_price(symbol: str) -> float:
-    url = f"{COINDCX_PUBLIC_URL}/exchange/ticker"
-    r = requests.get(url, timeout=10)
-    data = r.json()
+def _round_quantity(qty: Decimal) -> Decimal:
+    """
+    CoinDCX BTC minimum precision is 0.00001
+    """
+    return qty.quantize(Decimal("0.00001"), rounding=ROUND_DOWN)
 
-    for item in data:
-        if item["market"] == symbol:
-            return float(item["last_price"])
-
-    raise RuntimeError(f"Price not found for {symbol}")
 
 def place_market_buy_inr(symbol: str, amount_inr: int):
+    """
+    Places a market BUY using INR amount.
+    CoinDCX internally computes quantity.
+    """
+
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
@@ -35,14 +35,14 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
         "side": "buy",
         "order_type": "market",
         "market": symbol,
-        "total_price": amount_inr,   # 🔥 THIS is the key
+        "total_price": amount_inr,
         "timestamp": int(time.time() * 1000)
     }
 
     body_json = json.dumps(body, separators=(",", ":"))
 
     signature = hmac.new(
-        API_SECRET,
+        API_SECRET.encode(),
         body_json.encode(),
         hashlib.sha256
     ).hexdigest()
@@ -55,11 +55,22 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
 
     print("📤 COINDCX REQUEST BODY:", body_json)
 
-    response = requests.post(url, data=body_json, headers=headers, timeout=15)
+    try:
+        response = requests.post(
+            url,
+            data=body_json,
+            headers=headers,
+            timeout=15
+        )
+    except Exception as e:
+        return 500, {"status": "error", "message": str(e)}
 
     try:
         data = response.json()
     except Exception:
         data = response.text
+
+    print("📥 COINDCX STATUS:", response.status_code)
+    print("📥 COINDCX RESPONSE:", data)
 
     return response.status_code, data
