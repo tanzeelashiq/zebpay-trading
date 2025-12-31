@@ -11,7 +11,7 @@ COINDCX_BASE_URL = "https://api.coindcx.com"
 API_KEY = os.getenv("COINDCX_API_KEY")
 API_SECRET = os.getenv("COINDCX_API_SECRET")
 
-MIN_BTC_QTY = 0.0001  # <-- this is why 3e-05 fails
+MIN_BTC_QTY = 0.00001  # <-- this is why 3e-05 fails
 
 
 def get_btcinr_price():
