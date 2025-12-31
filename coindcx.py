@@ -4,7 +4,7 @@ import hashlib
 import json
 import requests
 import os
-from decimal import Decimal, ROUND_DOWN
+from decimal import Decimal
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
@@ -14,28 +14,39 @@ API_SECRET = os.getenv("COINDCX_API_SECRET")
 if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API keys not set")
 
-
-def _round_quantity(qty: Decimal) -> Decimal:
-    """
-    CoinDCX BTC minimum precision is 0.00001
-    """
-    return qty.quantize(Decimal("0.00001"), rounding=ROUND_DOWN)
+MIN_BTC_QTY = Decimal("0.00001")
 
 
-def place_market_buy_inr(symbol: str, amount_inr: int):
+def get_ticker_price(symbol: str) -> Decimal:
     """
-    Places a market BUY using INR amount.
-    CoinDCX internally computes quantity.
+    Fetch current market price
+    """
+    url = f"{COINDCX_BASE_URL}/exchange/ticker"
+    resp = requests.get(url, timeout=10)
+    data = resp.json()
+
+    for item in data:
+        if item["market"] == symbol:
+            return Decimal(item["last_price"])
+
+    raise RuntimeError("Market price not found")
+
+
+def place_market_buy_min_btc(symbol: str):
+    """
+    Buy minimum tradable BTC quantity directly
     """
 
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
+    quantity = MIN_BTC_QTY
+
     body = {
         "side": "buy",
         "order_type": "market",
         "market": symbol,
-        "total_price": amount_inr,
+        "quantity": float(quantity),
         "timestamp": int(time.time() * 1000)
     }
 
@@ -56,14 +67,9 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
     print("📤 COINDCX REQUEST BODY:", body_json)
 
     try:
-        response = requests.post(
-            url,
-            data=body_json,
-            headers=headers,
-            timeout=15
-        )
+        response = requests.post(url, data=body_json, headers=headers, timeout=15)
     except Exception as e:
-        return 500, {"status": "error", "message": str(e)}
+        return 500, {"error": str(e)}
 
     try:
         data = response.json()
