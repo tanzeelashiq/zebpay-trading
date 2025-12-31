@@ -7,8 +7,8 @@ import os
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
-API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET")
+API_SECRET = os.getenv("COINDCX_API_SECRET", "").strip()
+API_KEY = os.getenv("COINDCX_API_KEY", "").strip()
 
 if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API credentials not set")
