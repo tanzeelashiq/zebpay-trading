@@ -15,12 +15,14 @@ async def webhook(request: Request):
     if data.get("signal") != "BUY":
         return {"status": "ignored"}
 
-    print(f"⚡ Executing BUY for {EXCHANGE_SYMBOL} (₹{TRADE_AMOUNT_INR})")
+    print(f"⚡ Buying BTC for ₹{TRADE_AMOUNT_INR}")
 
     status_code, response = place_market_buy_inr(
         symbol=EXCHANGE_SYMBOL,
         amount_inr=TRADE_AMOUNT_INR
     )
+
+    print("📊 CoinDCX response:", response)
 
     return {
         "status": "ok",
@@ -30,3 +32,8 @@ async def webhook(request: Request):
         "coindcx_status": status_code,
         "coindcx_response": response
     }
+
+
+@app.get("/")
+def health():
+    return {"status": "alive"}
