@@ -44,6 +44,9 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
 
     response = requests.post(url, headers=headers, data=body_json, timeout=15)
 
+    print("🔐 API KEY length:", len(API_KEY))
+    print("🔐 API SECRET length:", len(API_SECRET))
+
     try:
         return response.status_code, response.json()
     except Exception:
