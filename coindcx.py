@@ -4,31 +4,36 @@ import hashlib
 import json
 import requests
 import os
-from decimal import Decimal, ROUND_UP
+import math
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
 API_SECRET = os.getenv("COINDCX_API_SECRET")
 
-MIN_BTC_QTY = Decimal("0.00001")
+MIN_BTC_QTY = 0.0001  # <-- this is why 3e-05 fails
 
 
-def get_btc_price(symbol: str) -> Decimal:
-    resp = requests.get(f"{COINDCX_BASE_URL}/exchange/ticker", timeout=10)
-    data = resp.json()
+def get_btcinr_price():
+    url = "https://api.coindcx.com/exchange/ticker"
+    res = requests.get(url, timeout=10)
+    data = res.json()
 
     for item in data:
-        if item["market"] == symbol:
-            return Decimal(item["last_price"])
+        if item["market"] == "BTCINR":
+            return float(item["last_price"])
 
-    raise RuntimeError("Price not found")
+    raise RuntimeError("BTCINR price not found")
 
 
-def place_market_buy(symbol: str):
-    price = get_btc_price(symbol)
+def place_market_buy_inr(symbol: str, amount_inr: float):
+    price = get_btcinr_price()
 
-    min_inr = (price * MIN_BTC_QTY).quantize(Decimal("1"), rounding=ROUND_UP)
+    quantity = amount_inr / price
+    quantity = math.floor(quantity * 1e8) / 1e8  # truncate
+
+    if quantity < MIN_BTC_QTY:
+        raise RuntimeError(f"Quantity too small: {quantity}")
 
     endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
@@ -37,7 +42,7 @@ def place_market_buy(symbol: str):
         "side": "buy",
         "order_type": "market",
         "market": symbol,
-        "total_price": int(min_inr),
+        "quantity": f"{quantity:.8f}",
         "timestamp": int(time.time() * 1000)
     }
 
@@ -55,13 +60,9 @@ def place_market_buy(symbol: str):
         "Content-Type": "application/json"
     }
 
-    print("📤 COINDCX REQUEST:", body_json)
-
-    response = requests.post(url, data=body_json, headers=headers, timeout=15)
+    response = requests.post(url, data=body_json, headers=headers, timeout=10)
 
     try:
-        data = response.json()
+        return response.status_code, response.json()
     except Exception:
-        data = response.text
-
-    return response.status_code, data
+        return response.status_code, response.text
