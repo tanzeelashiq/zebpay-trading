@@ -4,20 +4,40 @@ import hashlib
 import json
 import requests
 import os
+import math
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
 API_KEY = os.getenv("COINDCX_API_KEY").strip()
 API_SECRET = os.getenv("COINDCX_API_SECRET").strip().encode()
 
+MIN_BTC_QTY = 0.00001
+
+def get_btc_price_inr():
+    url = "https://api.coindcx.com/exchange/ticker"
+    data = requests.get(url, timeout=10).json()
+    for item in data:
+        if item["market"] == "BTCINR":
+            return float(item["last_price"])
+    raise RuntimeError("BTCINR price not found")
+
 def place_market_buy_inr(symbol: str, amount_inr: int):
-    endpoint = "/exchange/v1/orders/create_market_order"
+    price = get_btc_price_inr()
+
+    raw_qty = amount_inr / price
+    quantity = math.floor(raw_qty / MIN_BTC_QTY) * MIN_BTC_QTY
+
+    if quantity < MIN_BTC_QTY:
+        raise RuntimeError(f"Quantity too small: {quantity}")
+
+    endpoint = "/exchange/v1/orders/create"
     url = COINDCX_BASE_URL + endpoint
 
     body = {
         "side": "buy",
-        "market": symbol,          # BTCINR
-        "total_price": amount_inr, # ₹200
+        "order_type": "market",
+        "market": symbol,
+        "quantity": quantity,
         "timestamp": int(time.time() * 1000)
     }
 
@@ -37,12 +57,7 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
 
     print("📤 COINDCX REQUEST BODY:", body_json)
 
-    response = requests.post(
-        url,
-        data=body_json,
-        headers=headers,
-        timeout=15
-    )
+    response = requests.post(url, data=body_json, headers=headers, timeout=15)
 
     try:
         data = response.json()
