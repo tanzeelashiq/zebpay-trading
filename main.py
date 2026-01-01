@@ -3,23 +3,19 @@ from coindcx import place_market_buy_inr
 
 app = FastAPI()
 
-TRADE_AMOUNT_INR = 200
-EXCHANGE_SYMBOL = "BTCINR"
-
-
 @app.post("/webhook")
 async def webhook(request: Request):
     data = await request.json()
     print("📩 Received alert:", data)
 
     if data.get("signal") != "BUY":
-        return {"status": "ignored"}
+        return {"status": "ignored", "reason": "only BUY supported"}
 
-    print(f"⚡ Buying BTC for ₹{TRADE_AMOUNT_INR}")
+    print("⚡ Executing BUY for BTCINR (₹200)")
 
     status_code, response = place_market_buy_inr(
-        symbol=EXCHANGE_SYMBOL,
-        amount_inr=TRADE_AMOUNT_INR
+        symbol="BTCINR",
+        amount_inr=200
     )
 
     print("📊 CoinDCX response:", response)
@@ -27,12 +23,11 @@ async def webhook(request: Request):
     return {
         "status": "ok",
         "signal": "BUY",
-        "exchange_symbol": EXCHANGE_SYMBOL,
-        "amount_inr": TRADE_AMOUNT_INR,
+        "exchange_symbol": "BTCINR",
+        "amount_inr": 200,
         "coindcx_status": status_code,
         "coindcx_response": response
     }
-
 
 @app.get("/")
 def health():
