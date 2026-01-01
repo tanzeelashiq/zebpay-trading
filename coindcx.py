@@ -11,12 +11,11 @@ API_KEY = os.getenv("COINDCX_API_KEY").strip()
 API_SECRET = os.getenv("COINDCX_API_SECRET").strip().encode()
 
 def place_market_buy_inr(symbol: str, amount_inr: int):
-    endpoint = "/exchange/v1/orders/create"
+    endpoint = "/exchange/v1/orders/create_market_order"
     url = COINDCX_BASE_URL + endpoint
 
     body = {
         "side": "buy",
-        "order_type": "market",
         "market": symbol,          # BTCINR
         "total_price": amount_inr, # ₹200
         "timestamp": int(time.time() * 1000)
@@ -40,7 +39,7 @@ def place_market_buy_inr(symbol: str, amount_inr: int):
 
     response = requests.post(
         url,
-        data=body_json,   # IMPORTANT: data, not json=
+        data=body_json,
         headers=headers,
         timeout=15
     )
