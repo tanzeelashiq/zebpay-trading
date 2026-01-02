@@ -27,27 +27,25 @@ def get_btcinr_price() -> float:
 
 
 def place_market_buy_btcinr(amount_inr: int):
-    price = get_btcinr_price()
+    market_price = get_btcinr_price()
 
-    raw_qty = amount_inr / price
+    # CoinDCX requires integer INR price
+    price_inr = int(market_price)
+
+    # Compute BTC qty from integer price
+    qty = amount_inr / price_inr
 
     # BTC precision = 5 decimals
-    qty = math.floor(raw_qty * 1e5) / 1e5
+    qty = math.floor(qty * 1e5) / 1e5
 
-    # Adjust qty until INR value becomes integer
-    while True:
-        inr_value = qty * price
-        if float(int(inr_value)) == inr_value:
-            break
-        qty = math.floor((qty - 0.00001) * 1e5) / 1e5
-        if qty <= 0:
-            raise RuntimeError("Could not satisfy INR precision constraint")
+    if qty < 0.00001:
+        raise RuntimeError(f"BTC quantity too small: {qty}")
 
     body = {
         "side": "buy",
         "order_type": "limit_order",
         "market": "BTCINR",
-        "price": int(inr_value),
+        "price": price_inr,
         "quantity": qty,
         "timestamp": int(time.time() * 1000)
     }
