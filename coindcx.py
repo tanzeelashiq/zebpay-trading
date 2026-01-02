@@ -9,60 +9,46 @@ import math
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET")
+API_SECRET = os.getenv("COINDCX_API_SECRET").encode()
 
 if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API credentials not set")
 
-API_SECRET = API_SECRET.encode()
-
 
 def _sign(payload: str) -> str:
-    return hmac.new(
-        API_SECRET,
-        payload.encode(),
-        hashlib.sha256
-    ).hexdigest()
-
-
-def _round_down(value: float, decimals: int) -> float:
-    factor = 10 ** decimals
-    return math.floor(value * factor) / factor
+    return hmac.new(API_SECRET, payload.encode(), hashlib.sha256).hexdigest()
 
 
 def get_btcinr_price() -> float:
-    """Fetch latest BTCINR price"""
     url = "https://public.coindcx.com/market_data/trade_history?pair=I-BTC_INR&limit=1"
     r = requests.get(url, timeout=10)
     r.raise_for_status()
     return float(r.json()[0]["p"])
 
 
-def place_buy_btcinr(amount_inr: int):
-    """
-    SAFEST CoinDCX method:
-    LIMIT BUY slightly ABOVE market price
-    Behaves like market order but never fails
-    """
+def place_market_buy_btcinr(amount_inr: int):
+    price = get_btcinr_price()
 
-    market_price = get_btcinr_price()
+    raw_qty = amount_inr / price
 
-    # Buy slightly above market to guarantee fill
-    limit_price = market_price * 1.002  # +0.2%
+    # BTC precision = 5 decimals
+    qty = math.floor(raw_qty * 1e5) / 1e5
 
-    raw_qty = amount_inr / limit_price
-    quantity = _round_down(raw_qty, 5)  # BTC precision
-
-    MIN_QTY = 0.00001
-    if quantity < MIN_QTY:
-        raise RuntimeError(f"Quantity too small: {quantity}")
+    # Adjust qty until INR value becomes integer
+    while True:
+        inr_value = qty * price
+        if float(int(inr_value)) == inr_value:
+            break
+        qty = math.floor((qty - 0.00001) * 1e5) / 1e5
+        if qty <= 0:
+            raise RuntimeError("Could not satisfy INR precision constraint")
 
     body = {
         "side": "buy",
         "order_type": "limit_order",
         "market": "BTCINR",
-        "price": round(limit_price, 2),
-        "quantity": quantity,
+        "price": int(inr_value),
+        "quantity": qty,
         "timestamp": int(time.time() * 1000)
     }
 
