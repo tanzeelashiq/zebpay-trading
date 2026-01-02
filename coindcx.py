@@ -6,52 +6,108 @@ import requests
 import os
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
-
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET").encode()
+API_SECRET = os.getenv("COINDCX_API_SECRET")  # Don't encode here
 
 if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API credentials not set")
 
-
 def _sign(payload: str) -> str:
-    return hmac.new(API_SECRET, payload.encode(), hashlib.sha256).hexdigest()
+    """Generate HMAC signature for API request"""
+    return hmac.new(
+        API_SECRET.encode(),  # Encode only when signing
+        payload.encode(),
+        hashlib.sha256
+    ).hexdigest()
 
-
-def place_market_buy_btcinr(amount_inr: int):
-    """
-    INR-based MARKET BUY (official CoinDCX way)
-    """
-
-    body = {
-        "side": "buy",
-        "order_type": "market",
-        "market": "BTCINR",
-        "total_price": int(amount_inr),  # INR must be integer
-        "timestamp": int(time.time() * 1000)
-    }
-
+def _make_request(endpoint: str, body: dict):
+    """Common request handler with better error handling"""
+    body["timestamp"] = int(time.time() * 1000)
     body_json = json.dumps(body, separators=(",", ":"))
     signature = _sign(body_json)
-
+    
     headers = {
         "X-AUTH-APIKEY": API_KEY,
         "X-AUTH-SIGNATURE": signature,
         "Content-Type": "application/json"
     }
-
-    print("📤 COINDCX REQUEST BODY:", body_json)
-
-    response = requests.post(
-        COINDCX_BASE_URL + "/exchange/v1/orders/create",
-        data=body_json,
-        headers=headers,
-        timeout=15
-    )
-
+    
+    print(f"📤 COINDCX REQUEST to {endpoint}:", body_json)
+    
     try:
-        data = response.json()
-    except Exception:
-        data = response.text
+        response = requests.post(
+            COINDCX_BASE_URL + endpoint,
+            data=body_json,
+            headers=headers,
+            timeout=15
+        )
+        
+        try:
+            data = response.json()
+        except Exception:
+            data = {"error": "Invalid JSON response", "raw": response.text}
+        
+        print(f"📥 COINDCX RESPONSE [{response.status_code}]:", data)
+        return response.status_code, data
+        
+    except requests.exceptions.Timeout:
+        return 408, {"error": "Request timeout"}
+    except requests.exceptions.ConnectionError:
+        return 503, {"error": "Connection failed"}
+    except Exception as e:
+        return 500, {"error": str(e)}
 
-    return response.status_code, data
+def place_market_buy(market: str, amount_inr: int):
+    """
+    Place a MARKET BUY order (INR-based)
+    
+    Args:
+        market: Trading pair (e.g., "BTCINR", "ETHINR")
+        amount_inr: Amount in INR to spend (must be integer)
+    """
+    body = {
+        "side": "buy",
+        "order_type": "market",
+        "market": market,
+        "total_price": int(amount_inr)
+    }
+    return _make_request("/exchange/v1/orders/create", body)
+
+def place_market_sell(market: str, quantity: float):
+    """
+    Place a MARKET SELL order (quantity-based)
+    
+    Args:
+        market: Trading pair (e.g., "BTCINR", "ETHINR")
+        quantity: Amount of crypto to sell
+    """
+    body = {
+        "side": "sell",
+        "order_type": "market",
+        "market": market,
+        "total_quantity": quantity
+    }
+    return _make_request("/exchange/v1/orders/create", body)
+
+def get_balance(currency: str = "INR"):
+    """
+    Get balance for a specific currency
+    
+    Args:
+        currency: Currency code (e.g., "INR", "BTC", "ETH")
+    """
+    body = {"timestamp": int(time.time() * 1000)}
+    status_code, data = _make_request("/exchange/v1/users/balances", body)
+    
+    if status_code == 200 and isinstance(data, list):
+        for item in data:
+            if item.get("currency") == currency:
+                return status_code, item
+        return 404, {"error": f"Currency {currency} not found"}
+    
+    return status_code, data
+
+# Backward compatibility
+def place_market_buy_btcinr(amount_inr: int):
+    """Legacy function for BTC only"""
+    return place_market_buy("BTCINR", amount_inr)
