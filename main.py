@@ -1,6 +1,6 @@
 from fastapi import FastAPI, Request
 from symbol_map import SYMBOL_MAP
-from coindcx import place_market_buy_btcinr
+from coindcx import place_buy_btcinr
 import uvicorn
 import os
 
@@ -39,7 +39,9 @@ async def webhook(request: Request):
     print(f"⚡ Executing BUY for {exchange_symbol} (₹{TRADE_AMOUNT_INR})")
 
     try:
-        status_code, response = place_market_buy_btcinr(TRADE_AMOUNT_INR)
+        status_code, response = place_buy_btcinr(
+            amount_inr=TRADE_AMOUNT_INR
+        )
     except Exception as e:
         print("❌ Order execution failed:", str(e))
         return {
