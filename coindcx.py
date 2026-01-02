@@ -4,7 +4,6 @@ import hashlib
 import json
 import requests
 import os
-import math
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 
@@ -19,34 +18,16 @@ def _sign(payload: str) -> str:
     return hmac.new(API_SECRET, payload.encode(), hashlib.sha256).hexdigest()
 
 
-def get_btcinr_price() -> float:
-    url = "https://public.coindcx.com/market_data/trade_history?pair=I-BTC_INR&limit=1"
-    r = requests.get(url, timeout=10)
-    r.raise_for_status()
-    return float(r.json()[0]["p"])
-
-
 def place_market_buy_btcinr(amount_inr: int):
-    market_price = get_btcinr_price()
-
-    # CoinDCX requires integer INR price
-    price_inr = int(market_price)
-
-    # Compute BTC qty from integer price
-    qty = amount_inr / price_inr
-
-    # BTC precision = 5 decimals
-    qty = math.floor(qty * 1e5) / 1e5
-
-    if qty < 0.00001:
-        raise RuntimeError(f"BTC quantity too small: {qty}")
+    """
+    INR-based MARKET BUY (official CoinDCX way)
+    """
 
     body = {
         "side": "buy",
-        "order_type": "limit_order",
+        "order_type": "market",
         "market": "BTCINR",
-        "price": price_inr,
-        "quantity": qty,
+        "total_price": int(amount_inr),  # INR must be integer
         "timestamp": int(time.time() * 1000)
     }
 
