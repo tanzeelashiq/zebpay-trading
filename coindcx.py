@@ -32,7 +32,7 @@ def _round_down(value: float, decimals: int) -> float:
 
 def get_btcinr_price() -> float:
     """Fetch latest BTCINR price"""
-    url = "https://public.coindcx.com/market_data/trade_history?pair=BTCINR&limit=1"
+    url = "https://public.coindcx.com/market_data/trade_history?pair=I-BTC_INR&limit=1"
     r = requests.get(url, timeout=10)
     r.raise_for_status()
     return float(r.json()[0]["p"])
