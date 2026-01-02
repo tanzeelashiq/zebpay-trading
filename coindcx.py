@@ -42,12 +42,22 @@ def _make_request(endpoint: str, body: dict):
             timeout=15
         )
         
+        # Log raw response for debugging
+        print(f"📥 COINDCX RAW RESPONSE [{response.status_code}]:")
+        print(f"   Headers: {dict(response.headers)}")
+        print(f"   Body: {response.text[:500]}")  # First 500 chars
+        
         try:
             data = response.json()
-        except Exception:
-            data = {"error": "Invalid JSON response", "raw": response.text}
+        except Exception as e:
+            data = {
+                "error": "Invalid JSON response", 
+                "raw": response.text,
+                "status_code": response.status_code,
+                "headers": dict(response.headers)
+            }
         
-        print(f"📥 COINDCX RESPONSE [{response.status_code}]:", data)
+        print(f"📥 COINDCX PARSED:", data)
         return response.status_code, data
         
     except requests.exceptions.Timeout:
