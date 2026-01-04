@@ -4,6 +4,7 @@ import hashlib
 import json
 import requests
 import os
+from decimal import Decimal
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 API_KEY = os.getenv("COINDCX_API_KEY")
@@ -23,6 +24,18 @@ def _sign(payload: str) -> str:
 def _make_request(endpoint: str, body: dict):
     """Common request handler with better error handling"""
     body["timestamp"] = int(time.time() * 1000)
+    
+    # Custom JSON encoding to avoid scientific notation
+    def decimal_encoder(obj):
+        if isinstance(obj, float):
+            return format(obj, '.8f').rstrip('0').rstrip('.')
+        return obj
+    
+    # Convert float values to strings to avoid scientific notation
+    for key, value in body.items():
+        if isinstance(value, float):
+            body[key] = float(format(value, '.8f'))
+    
     body_json = json.dumps(body, separators=(",", ":"))
     signature = _sign(body_json)
     
@@ -99,17 +112,19 @@ def place_market_buy(market: str, amount_inr: int):
     # Calculate quantity to buy (with small buffer for price fluctuation)
     quantity = (amount_inr * 0.99) / current_price
     
-    # Round to 6 decimal places for BTC (CoinDCX requirement)
-    quantity = round(quantity, 6)
+    # Use Decimal to format properly without scientific notation
+    quantity_str = format(Decimal(str(quantity)), '.6f')
+    quantity_formatted = float(quantity_str)
     
     print(f"💰 Current {market} price: ₹{current_price}")
     print(f"📊 Calculated quantity: {quantity}")
+    print(f"📊 Formatted quantity: {quantity_formatted}")
     
     body = {
         "side": "buy",
         "order_type": "market_order",
         "market": market,
-        "total_quantity": float(f"{quantity:.6f}"),  # Ensure no scientific notation
+        "total_quantity": quantity_formatted,
         "ecode": "I"
     }
     return _make_request("/exchange/v1/orders/create", body)
