@@ -99,8 +99,8 @@ def place_market_buy(market: str, amount_inr: int):
     # Calculate quantity to buy (with small buffer for price fluctuation)
     quantity = (amount_inr * 0.99) / current_price
     
-    # Round to 8 decimal places for BTC
-    quantity = round(quantity, 8)
+    # Round to 6 decimal places for BTC (CoinDCX requirement)
+    quantity = round(quantity, 6)
     
     print(f"💰 Current {market} price: ₹{current_price}")
     print(f"📊 Calculated quantity: {quantity}")
