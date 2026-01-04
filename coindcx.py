@@ -109,7 +109,7 @@ def place_market_buy(market: str, amount_inr: int):
         "side": "buy",
         "order_type": "market_order",
         "market": market,
-        "total_quantity": quantity,
+        "total_quantity": float(f"{quantity:.6f}"),  # Ensure no scientific notation
         "ecode": "I"
     }
     return _make_request("/exchange/v1/orders/create", body)
