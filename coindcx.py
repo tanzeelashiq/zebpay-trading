@@ -77,9 +77,10 @@ def place_market_buy(market: str, amount_inr: int):
     """
     body = {
         "side": "buy",
-        "order_type": "market",
+        "order_type": "market_order",
         "market": market,
-        "total_price": int(amount_inr)
+        "total_price": int(amount_inr),
+        "ecode": "I"  # Required for INR markets
     }
     return _make_request("/exchange/v1/orders/create", body)
 
@@ -93,9 +94,10 @@ def place_market_sell(market: str, quantity: float):
     """
     body = {
         "side": "sell",
-        "order_type": "market",
+        "order_type": "market_order",
         "market": market,
-        "total_quantity": quantity
+        "total_quantity": quantity,
+        "ecode": "I"  # Required for INR markets
     }
     return _make_request("/exchange/v1/orders/create", body)
 
