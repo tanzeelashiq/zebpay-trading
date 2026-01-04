@@ -25,18 +25,43 @@ def _make_request(endpoint: str, body: dict):
     """Common request handler with better error handling"""
     body["timestamp"] = int(time.time() * 1000)
     
-    # Custom JSON encoding to avoid scientific notation
-    def decimal_encoder(obj):
-        if isinstance(obj, float):
-            return format(obj, '.8f').rstrip('0').rstrip('.')
-        return obj
+    # Custom JSON serializer to handle floats without scientific notation
+    class DecimalEncoder(json.JSONEncoder):
+        def encode(self, obj):
+            if isinstance(obj, float):
+                # Format float without scientific notation
+                return format(obj, 'f')
+            return super().encode(obj)
+        
+        def iterencode(self, obj, _one_shot=False):
+            """Encode while avoiding scientific notation for floats"""
+            for chunk in super().iterencode(obj, _one_shot):
+                # Replace any scientific notation that might have slipped through
+                chunk = chunk.replace('e-0', 'E-0')  # Make it easier to find
+                if 'E-' in chunk or 'e-' in chunk:
+                    # This shouldn't happen with our formatting, but just in case
+                    pass
+                yield chunk
     
-    # Convert float values to strings to avoid scientific notation
+    # Manually build JSON to ensure no scientific notation
+    json_parts = []
+    json_parts.append('{')
+    items = []
     for key, value in body.items():
         if isinstance(value, float):
-            body[key] = float(format(value, '.8f'))
+            # Format float with enough precision, strip trailing zeros
+            formatted = format(value, '.10f').rstrip('0').rstrip('.')
+            items.append(f'"{key}":{formatted}')
+        elif isinstance(value, str):
+            items.append(f'"{key}":"{value}"')
+        elif isinstance(value, int):
+            items.append(f'"{key}":{value}')
+        else:
+            items.append(f'"{key}":{json.dumps(value)}')
+    json_parts.append(','.join(items))
+    json_parts.append('}')
     
-    body_json = json.dumps(body, separators=(",", ":"))
+    body_json = ''.join(json_parts)
     signature = _sign(body_json)
     
     headers = {
