@@ -67,6 +67,22 @@ def _make_request(endpoint: str, body: dict):
     except Exception as e:
         return 500, {"error": str(e)}
 
+def get_ticker_price(market: str):
+    """Get current market price from ticker"""
+    try:
+        response = requests.get(
+            f"{COINDCX_BASE_URL}/exchange/ticker",
+            timeout=10
+        )
+        data = response.json()
+        for ticker in data:
+            if ticker.get("market") == market:
+                return float(ticker.get("last_price", 0))
+        return None
+    except Exception as e:
+        print(f"Error fetching ticker: {e}")
+        return None
+
 def place_market_buy(market: str, amount_inr: int):
     """
     Place a MARKET BUY order (INR-based)
@@ -75,12 +91,26 @@ def place_market_buy(market: str, amount_inr: int):
         market: Trading pair (e.g., "BTCINR", "ETHINR")
         amount_inr: Amount in INR to spend (must be integer)
     """
+    # Get current market price
+    current_price = get_ticker_price(market)
+    if not current_price:
+        return 500, {"error": "Could not fetch current market price"}
+    
+    # Calculate quantity to buy (with small buffer for price fluctuation)
+    quantity = (amount_inr * 0.99) / current_price
+    
+    # Round to 8 decimal places for BTC
+    quantity = round(quantity, 8)
+    
+    print(f"💰 Current {market} price: ₹{current_price}")
+    print(f"📊 Calculated quantity: {quantity}")
+    
     body = {
         "side": "buy",
         "order_type": "market_order",
         "market": market,
-        "total_price": int(amount_inr),
-        "ecode": "I"  # Required for INR markets
+        "total_quantity": quantity,
+        "ecode": "I"
     }
     return _make_request("/exchange/v1/orders/create", body)
 
