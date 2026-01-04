@@ -124,6 +124,7 @@ def get_ticker_price(market: str):
 def place_market_buy(market: str, amount_inr: int):
     """
     Place a MARKET BUY order (INR-based)
+    Uses limit order at 1% above market price to ensure immediate fill
     
     Args:
         market: Trading pair (e.g., "BTCINR", "ETHINR")
@@ -134,21 +135,30 @@ def place_market_buy(market: str, amount_inr: int):
     if not current_price:
         return 500, {"error": "Could not fetch current market price"}
     
-    # Calculate quantity to buy (with small buffer for price fluctuation)
-    quantity = (amount_inr * 0.99) / current_price
+    # Set limit price 1% above market to ensure immediate fill (like market order)
+    limit_price = current_price * 1.01
+    
+    # Calculate quantity to buy
+    quantity = amount_inr / limit_price
     
     # Use Decimal to format properly without scientific notation
     quantity_str = format(Decimal(str(quantity)), '.6f')
     quantity_formatted = float(quantity_str)
     
+    # Format price without scientific notation
+    price_str = format(Decimal(str(limit_price)), '.2f')
+    price_formatted = float(price_str)
+    
     print(f"💰 Current {market} price: ₹{current_price}")
+    print(f"📊 Limit price (1% above): ₹{price_formatted}")
     print(f"📊 Calculated quantity: {quantity}")
     print(f"📊 Formatted quantity: {quantity_formatted}")
     
     body = {
         "side": "buy",
-        "order_type": "market_order",
+        "order_type": "limit_order",  # Use limit order for guaranteed execution
         "market": market,
+        "price_per_unit": price_formatted,
         "total_quantity": quantity_formatted,
         "ecode": "I"
     }
