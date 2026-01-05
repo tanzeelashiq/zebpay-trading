@@ -193,13 +193,18 @@ def place_market_buy(market: str, amount_inr: int):
     print(f"💵 Order value: ₹{order_value:.2f}")
     
     body = {
-        "side": "buy",
-        "order_type": "limit_order",
         "market": market,
-        "price_per_unit": limit_price,
         "total_quantity": quantity,
+        "price_per_unit": limit_price,
+        "side": "buy",  # CoinDCX docs show lowercase
+        "order_type": "limit_order",
+        "timestamp": int(time.time() * 1000),
         "ecode": "I"
     }
+    
+    # Remove timestamp as it will be added by _make_request
+    body.pop("timestamp")
+    
     return _make_request("/exchange/v1/orders/create", body)
 
 def place_market_sell(market: str, quantity: float):
