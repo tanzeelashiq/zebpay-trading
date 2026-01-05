@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from symbol_map import SYMBOL_MAP
-from coindcx import place_market_buy, place_market_sell, get_balance
+from coindcx import place_market_buy, place_market_sell, get_balance, get_market_details
 from config import TRADE_AMOUNT_INR, ALLOWED_SYMBOLS, ENABLE_TRADING
 import uvicorn
 import os
@@ -156,6 +156,28 @@ async def check_balance(currency: str):
     return JSONResponse(
         status_code=status_code,
         content=data
+    )
+
+@app.get("/market-details/{market}")
+async def market_details(market: str):
+    """Get market details for a specific pair"""
+    details = get_market_details(market.upper())
+    if details:
+        return {
+            "market": details.get("coindcx_name"),
+            "min_quantity": details.get("min_quantity"),
+            "max_quantity": details.get("max_quantity"),
+            "min_price": details.get("min_price"),
+            "max_price": details.get("max_price"),
+            "min_notional": details.get("min_notional"),
+            "base_currency_precision": details.get("base_currency_precision"),
+            "target_currency_precision": details.get("target_currency_precision"),
+            "step": details.get("step"),
+            "status": details.get("status")
+        }
+    return JSONResponse(
+        status_code=404,
+        content={"error": f"Market {market} not found"}
     )
 
 if __name__ == "__main__":
