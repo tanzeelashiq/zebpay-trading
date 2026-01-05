@@ -4,11 +4,10 @@ import hashlib
 import json
 import requests
 import os
-from decimal import Decimal
 
 COINDCX_BASE_URL = "https://api.coindcx.com"
 API_KEY = os.getenv("COINDCX_API_KEY")
-API_SECRET = os.getenv("COINDCX_API_SECRET")  # Don't encode here
+API_SECRET = os.getenv("COINDCX_API_SECRET")
 
 if not API_KEY or not API_SECRET:
     raise RuntimeError("CoinDCX API credentials not set")
@@ -16,233 +15,141 @@ if not API_KEY or not API_SECRET:
 def _sign(payload: str) -> str:
     """Generate HMAC signature for API request"""
     return hmac.new(
-        API_SECRET.encode(),  # Encode only when signing
+        API_SECRET.encode(),
         payload.encode(),
         hashlib.sha256
     ).hexdigest()
 
-def _make_request(endpoint: str, body: dict):
-    """Common request handler with better error handling"""
-    body["timestamp"] = int(time.time() * 1000)
+def place_order(market: str, side: str, order_type: str, total_quantity: float, price_per_unit: int = None):
+    """
+    Place an order on CoinDCX
     
-    # Custom JSON serializer to handle floats without scientific notation
-    class DecimalEncoder(json.JSONEncoder):
-        def encode(self, obj):
-            if isinstance(obj, float):
-                # Format float without scientific notation
-                return format(obj, 'f')
-            return super().encode(obj)
-        
-        def iterencode(self, obj, _one_shot=False):
-            """Encode while avoiding scientific notation for floats"""
-            for chunk in super().iterencode(obj, _one_shot):
-                # Replace any scientific notation that might have slipped through
-                chunk = chunk.replace('e-0', 'E-0')  # Make it easier to find
-                if 'E-' in chunk or 'e-' in chunk:
-                    # This shouldn't happen with our formatting, but just in case
-                    pass
-                yield chunk
+    Args:
+        market: Trading pair (e.g., "BTCINR")
+        side: "buy" or "sell"
+        order_type: "limit_order" or "market_order"
+        total_quantity: Quantity of crypto to trade
+        price_per_unit: Price per unit (required for limit_order, optional for market_order)
+    """
+    timeStamp = int(time.time() * 1000)
     
-    # Manually build JSON to ensure no scientific notation
-    json_parts = []
-    json_parts.append('{')
-    items = []
-    for key, value in body.items():
-        if isinstance(value, float):
-            # Format float with enough precision, strip trailing zeros
-            formatted = format(value, '.10f').rstrip('0').rstrip('.')
-            items.append(f'"{key}":{formatted}')
-        elif isinstance(value, str):
-            items.append(f'"{key}":"{value}"')
-        elif isinstance(value, int):
-            items.append(f'"{key}":{value}')
-        else:
-            items.append(f'"{key}":{json.dumps(value)}')
-    json_parts.append(','.join(items))
-    json_parts.append('}')
-    
-    body_json = ''.join(json_parts)
-    signature = _sign(body_json)
-    
-    headers = {
-        "X-AUTH-APIKEY": API_KEY,
-        "X-AUTH-SIGNATURE": signature,
-        "Content-Type": "application/json"
+    # Build body with required parameters in exact order from docs
+    body = {
+        "side": side,
+        "order_type": order_type,
+        "market": market,
+        "total_quantity": total_quantity,
+        "timestamp": timeStamp
     }
     
-    print(f"📤 COINDCX REQUEST to {endpoint}:", body_json)
+    # Add price_per_unit if provided (required for limit orders)
+    if price_per_unit is not None:
+        body["price_per_unit"] = price_per_unit
+    
+    json_body = json.dumps(body, separators=(',', ':'))
+    signature = _sign(json_body)
+    
+    headers = {
+        'Content-Type': 'application/json',
+        'X-AUTH-APIKEY': API_KEY,
+        'X-AUTH-SIGNATURE': signature
+    }
+    
+    print(f"📤 REQUEST: {json_body}")
     
     try:
         response = requests.post(
-            COINDCX_BASE_URL + endpoint,
-            data=body_json,
+            COINDCX_BASE_URL + "/exchange/v1/orders/create",
+            data=json_body,
             headers=headers,
             timeout=15
         )
         
-        # Log raw response for debugging
-        print(f"📥 COINDCX RAW RESPONSE [{response.status_code}]:")
-        print(f"   Headers: {dict(response.headers)}")
-        print(f"   Body: {response.text[:500]}")  # First 500 chars
+        print(f"📥 RESPONSE [{response.status_code}]: {response.text}")
         
         try:
             data = response.json()
-        except Exception as e:
-            data = {
-                "error": "Invalid JSON response", 
-                "raw": response.text,
-                "status_code": response.status_code,
-                "headers": dict(response.headers)
-            }
+        except:
+            data = {"error": "Invalid response", "raw": response.text}
         
-        print(f"📥 COINDCX PARSED:", data)
         return response.status_code, data
         
-    except requests.exceptions.Timeout:
-        return 408, {"error": "Request timeout"}
-    except requests.exceptions.ConnectionError:
-        return 503, {"error": "Connection failed"}
     except Exception as e:
         return 500, {"error": str(e)}
 
 def get_ticker_price(market: str):
-    """Get current market price from ticker"""
+    """Get current market price"""
     try:
-        response = requests.get(
-            f"{COINDCX_BASE_URL}/exchange/ticker",
-            timeout=10
-        )
+        response = requests.get(f"{COINDCX_BASE_URL}/exchange/ticker", timeout=10)
         data = response.json()
         for ticker in data:
             if ticker.get("market") == market:
                 return float(ticker.get("last_price", 0))
         return None
-    except Exception as e:
-        print(f"Error fetching ticker: {e}")
+    except:
         return None
 
-def get_market_details(market: str):
-    """Get market details including min/max limits"""
-    try:
-        response = requests.get(
-            f"{COINDCX_BASE_URL}/exchange/v1/markets_details",
-            timeout=10
-        )
-        data = response.json()
-        for item in data:
-            if item.get("coindcx_name") == market:
-                return item
-        return None
-    except Exception as e:
-        print(f"Error fetching market details: {e}")
-        return None
-
-def place_market_buy(market: str, amount_inr: int):
+def place_market_buy_btcinr(amount_inr: int):
     """
-    Place a MARKET BUY order (INR-based)
-    Uses limit order at 1% above market price to ensure immediate fill
-    
-    Args:
-        market: Trading pair (e.g., "BTCINR", "ETHINR")
-        amount_inr: Amount in INR to spend (must be integer)
+    Buy BTC with INR amount
+    Uses limit order at current price to ensure execution
     """
-    # Get market details to check requirements
-    market_details = get_market_details(market)
-    if not market_details:
-        return 500, {"error": "Could not fetch market details"}
-    
-    min_quantity = float(market_details.get("min_quantity", 0))
-    min_notional = float(market_details.get("min_notional", 0))
-    step = float(market_details.get("step", 0))
-    
-    print(f"📋 Market details - min_qty: {min_quantity}, min_notional: ₹{min_notional}, step: {step}")
-    
-    # Get current market price
-    current_price = get_ticker_price(market)
+    # Get current price
+    current_price = get_ticker_price("BTCINR")
     if not current_price:
-        return 500, {"error": "Could not fetch current market price"}
+        return 500, {"error": "Could not fetch price"}
     
-    # Set limit price 1% above market to ensure immediate fill (like market order)
-    # Round to integer for INR (precision must be 0)
-    limit_price = int(current_price * 1.01)
+    # Calculate quantity (minimum 0.00001 BTC for BTCINR)
+    # Round to 6 decimals as per BTCINR precision
+    quantity = round(amount_inr / current_price, 6)
     
-    # Calculate quantity to buy
-    quantity = amount_inr / limit_price
+    # Ensure minimum quantity
+    if quantity < 0.00001:
+        quantity = 0.00001
     
-    # Round down to nearest step
-    quantity = int(quantity / step) * step
+    # Use current price as limit (will execute immediately like market order)
+    price = int(current_price)  # INR must be integer
     
-    # Ensure minimum quantity is met
-    if quantity < min_quantity:
-        quantity = min_quantity
+    print(f"💰 Price: ₹{price}, Quantity: {quantity} BTC")
     
-    # Round to 6 decimal places (target_currency_precision)
-    quantity = round(quantity, 6)
-    
-    # Check if order value meets min_notional
-    order_value = quantity * limit_price
-    if order_value < min_notional:
-        return 400, {
-            "error": f"Order value ₹{order_value:.2f} is below minimum ₹{min_notional}",
-            "suggestion": f"Increase TRADE_AMOUNT_INR to at least ₹{int(min_notional * 1.1)}"
-        }
-    
-    print(f"💰 Current {market} price: ₹{current_price}")
-    print(f"📊 Limit price (1% above): ₹{limit_price}")
-    print(f"📊 Calculated quantity: {quantity}")
-    print(f"💵 Order value: ₹{order_value:.2f}")
-    
-    body = {
-        "market": market,
-        "total_quantity": quantity,
-        "price_per_unit": limit_price,
-        "side": "buy",  # CoinDCX docs show lowercase
-        "order_type": "limit_order",
-        "timestamp": int(time.time() * 1000),
-        "ecode": "I"
-    }
-    
-    # Remove timestamp as it will be added by _make_request
-    body.pop("timestamp")
-    
-    return _make_request("/exchange/v1/orders/create", body)
-
-def place_market_sell(market: str, quantity: float):
-    """
-    Place a MARKET SELL order (quantity-based)
-    
-    Args:
-        market: Trading pair (e.g., "BTCINR", "ETHINR")
-        quantity: Amount of crypto to sell
-    """
-    body = {
-        "side": "sell",
-        "order_type": "market_order",
-        "market": market,
-        "total_quantity": quantity,
-        "ecode": "I"  # Required for INR markets
-    }
-    return _make_request("/exchange/v1/orders/create", body)
+    return place_order(
+        market="BTCINR",
+        side="buy",
+        order_type="limit_order",
+        total_quantity=quantity,
+        price_per_unit=price
+    )
 
 def get_balance(currency: str = "INR"):
-    """
-    Get balance for a specific currency
+    """Get balance for a currency"""
+    timeStamp = int(time.time() * 1000)
+    body = {"timestamp": timeStamp}
+    json_body = json.dumps(body, separators=(',', ':'))
+    signature = _sign(json_body)
     
-    Args:
-        currency: Currency code (e.g., "INR", "BTC", "ETH")
-    """
-    body = {"timestamp": int(time.time() * 1000)}
-    status_code, data = _make_request("/exchange/v1/users/balances", body)
+    headers = {
+        'Content-Type': 'application/json',
+        'X-AUTH-APIKEY': API_KEY,
+        'X-AUTH-SIGNATURE': signature
+    }
     
-    if status_code == 200 and isinstance(data, list):
-        for item in data:
-            if item.get("currency") == currency:
-                return status_code, item
-        return 404, {"error": f"Currency {currency} not found"}
-    
-    return status_code, data
-
-# Backward compatibility
-def place_market_buy_btcinr(amount_inr: int):
-    """Legacy function for BTC only"""
-    return place_market_buy("BTCINR", amount_inr)
+    try:
+        response = requests.post(
+            COINDCX_BASE_URL + "/exchange/v1/users/balances",
+            data=json_body,
+            headers=headers,
+            timeout=15
+        )
+        
+        data = response.json()
+        
+        if response.status_code == 200 and isinstance(data, list):
+            for item in data:
+                if item.get("currency") == currency:
+                    return response.status_code, item
+            return 404, {"error": f"Currency {currency} not found"}
+        
+        return response.status_code, data
+        
+    except Exception as e:
+        return 500, {"error": str(e)}
