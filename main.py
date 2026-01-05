@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.responses import JSONResponse
 from symbol_map import SYMBOL_MAP
-from coindcx import place_market_buy, place_market_sell, get_balance, get_market_details
+from coindcx import place_market_buy_btcinr, get_balance
 from config import TRADE_AMOUNT_INR, ALLOWED_SYMBOLS, ENABLE_TRADING
 import uvicorn
 import os
@@ -85,17 +85,13 @@ async def webhook(request: Request):
     
     try:
         if signal == "BUY":
-            status_code, response = place_market_buy(
-                market=exchange_symbol,
+            status_code, response = place_market_buy_btcinr(
                 amount_inr=TRADE_AMOUNT_INR
             )
             
         elif signal == "SELL":
-            # For SELL, we need to get the available balance
-            # Extract base currency (e.g., "BTC" from "BTCINR")
-            base_currency = exchange_symbol.replace("INR", "")
-            
-            bal_status, bal_data = get_balance(base_currency)
+            # For SELL, we need the available BTC balance
+            bal_status, bal_data = get_balance("BTC")
             if bal_status != 200:
                 raise Exception(f"Failed to get balance: {bal_data}")
             
@@ -103,12 +99,22 @@ async def webhook(request: Request):
             if available_qty <= 0:
                 return {
                     "status": "error",
-                    "reason": f"no {base_currency} balance to sell"
+                    "reason": "no BTC balance to sell"
                 }
             
-            status_code, response = place_market_sell(
+            # Use generic place_order for sell
+            from coindcx import place_order, get_ticker_price
+            
+            current_price = get_ticker_price(exchange_symbol)
+            if not current_price:
+                return {"status": "error", "reason": "Could not fetch price"}
+            
+            status_code, response = place_order(
                 market=exchange_symbol,
-                quantity=available_qty
+                side="sell",
+                order_type="limit_order",
+                total_quantity=available_qty,
+                price_per_unit=int(current_price)
             )
         
     except Exception as e:
@@ -156,28 +162,6 @@ async def check_balance(currency: str):
     return JSONResponse(
         status_code=status_code,
         content=data
-    )
-
-@app.get("/market-details/{market}")
-async def market_details(market: str):
-    """Get market details for a specific pair"""
-    details = get_market_details(market.upper())
-    if details:
-        return {
-            "market": details.get("coindcx_name"),
-            "min_quantity": details.get("min_quantity"),
-            "max_quantity": details.get("max_quantity"),
-            "min_price": details.get("min_price"),
-            "max_price": details.get("max_price"),
-            "min_notional": details.get("min_notional"),
-            "base_currency_precision": details.get("base_currency_precision"),
-            "target_currency_precision": details.get("target_currency_precision"),
-            "step": details.get("step"),
-            "status": details.get("status")
-        }
-    return JSONResponse(
-        status_code=404,
-        content={"error": f"Market {market} not found"}
     )
 
 if __name__ == "__main__":
