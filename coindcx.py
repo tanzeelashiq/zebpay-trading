@@ -121,6 +121,22 @@ def get_ticker_price(market: str):
         print(f"Error fetching ticker: {e}")
         return None
 
+def get_market_details(market: str):
+    """Get market details including min/max limits"""
+    try:
+        response = requests.get(
+            f"{COINDCX_BASE_URL}/exchange/v1/markets_details",
+            timeout=10
+        )
+        data = response.json()
+        for item in data:
+            if item.get("coindcx_name") == market:
+                return item
+        return None
+    except Exception as e:
+        print(f"Error fetching market details: {e}")
+        return None
+
 def place_market_buy(market: str, amount_inr: int):
     """
     Place a MARKET BUY order (INR-based)
