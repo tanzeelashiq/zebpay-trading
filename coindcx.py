@@ -146,6 +146,17 @@ def place_market_buy(market: str, amount_inr: int):
         market: Trading pair (e.g., "BTCINR", "ETHINR")
         amount_inr: Amount in INR to spend (must be integer)
     """
+    # Get market details to check requirements
+    market_details = get_market_details(market)
+    if not market_details:
+        return 500, {"error": "Could not fetch market details"}
+    
+    min_quantity = float(market_details.get("min_quantity", 0))
+    min_notional = float(market_details.get("min_notional", 0))
+    step = float(market_details.get("step", 0))
+    
+    print(f"📋 Market details - min_qty: {min_quantity}, min_notional: ₹{min_notional}, step: {step}")
+    
     # Get current market price
     current_price = get_ticker_price(market)
     if not current_price:
@@ -158,21 +169,35 @@ def place_market_buy(market: str, amount_inr: int):
     # Calculate quantity to buy
     quantity = amount_inr / limit_price
     
-    # Use Decimal to format properly without scientific notation
-    quantity_str = format(Decimal(str(quantity)), '.6f')
-    quantity_formatted = float(quantity_str)
+    # Round down to nearest step
+    quantity = int(quantity / step) * step
+    
+    # Ensure minimum quantity is met
+    if quantity < min_quantity:
+        quantity = min_quantity
+    
+    # Round to 6 decimal places (target_currency_precision)
+    quantity = round(quantity, 6)
+    
+    # Check if order value meets min_notional
+    order_value = quantity * limit_price
+    if order_value < min_notional:
+        return 400, {
+            "error": f"Order value ₹{order_value:.2f} is below minimum ₹{min_notional}",
+            "suggestion": f"Increase TRADE_AMOUNT_INR to at least ₹{int(min_notional * 1.1)}"
+        }
     
     print(f"💰 Current {market} price: ₹{current_price}")
     print(f"📊 Limit price (1% above): ₹{limit_price}")
     print(f"📊 Calculated quantity: {quantity}")
-    print(f"📊 Formatted quantity: {quantity_formatted}")
+    print(f"💵 Order value: ₹{order_value:.2f}")
     
     body = {
         "side": "buy",
-        "order_type": "limit_order",  # Use limit order for guaranteed execution
+        "order_type": "limit_order",
         "market": market,
-        "price_per_unit": limit_price,  # Must be integer for INR
-        "total_quantity": quantity_formatted,
+        "price_per_unit": limit_price,
+        "total_quantity": quantity,
         "ecode": "I"
     }
     return _make_request("/exchange/v1/orders/create", body)
