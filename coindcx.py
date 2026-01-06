@@ -20,6 +20,22 @@ def _sign(payload: str) -> str:
         hashlib.sha256
     ).hexdigest()
 
+def get_market_details(market: str):
+    """Get market details including min/max limits"""
+    try:
+        response = requests.get(
+            f"{COINDCX_BASE_URL}/exchange/v1/markets_details",
+            timeout=10
+        )
+        data = response.json()
+        for item in data:
+            if item.get("coindcx_name") == market:
+                return item
+        return None
+    except Exception as e:
+        print(f"Error fetching market details: {e}")
+        return None
+
 def place_order(market: str, side: str, order_type: str, total_quantity: float, price_per_unit: int = None):
     """
     Place an order on CoinDCX
@@ -46,7 +62,24 @@ def place_order(market: str, side: str, order_type: str, total_quantity: float, 
     if price_per_unit is not None:
         body["price_per_unit"] = price_per_unit
     
-    json_body = json.dumps(body, separators=(',', ':'))
+    # CRITICAL: Manual JSON building to avoid scientific notation
+    json_parts = []
+    json_parts.append('{"side":"' + str(body["side"]) + '"')
+    json_parts.append(',"order_type":"' + str(body["order_type"]) + '"')
+    json_parts.append(',"market":"' + str(body["market"]) + '"')
+    
+    # Format total_quantity without scientific notation
+    qty_str = format(body["total_quantity"], '.10f').rstrip('0').rstrip('.')
+    json_parts.append(',"total_quantity":' + qty_str)
+    
+    json_parts.append(',"timestamp":' + str(body["timestamp"]))
+    
+    if price_per_unit is not None:
+        json_parts.append(',"price_per_unit":' + str(body["price_per_unit"]))
+    
+    json_parts.append('}')
+    
+    json_body = ''.join(json_parts)
     signature = _sign(json_body)
     
     headers = {
@@ -91,24 +124,30 @@ def get_ticker_price(market: str):
 
 def place_market_buy_btcinr(amount_inr: int):
     """
-    Buy BTC - uses 2x minimum quantity
+    Buy BTC - uses 2x minimum quantity from market details
     Uses limit order at current price to ensure execution
     """
+    # Get market details to find exact min_quantity
+    market_details = get_market_details("BTCINR")
+    if not market_details:
+        return 500, {"error": "Could not fetch market details"}
+    
+    min_quantity = float(market_details.get("min_quantity", 0.00001))
+    
     # Get current price
     current_price = get_ticker_price("BTCINR")
     if not current_price:
         return 500, {"error": "Could not fetch price"}
     
-    # BTCINR minimum quantity is 0.00001 BTC
-    # We'll buy exactly 2x minimum = 0.00002 BTC
-    MIN_QUANTITY = 0.00001
-    quantity = MIN_QUANTITY * 2  # 0.00002 BTC
+    # Buy exactly 2x minimum quantity
+    quantity = min_quantity * 2
     
     # Use current price as limit (will execute immediately like market order)
     price = int(current_price)  # INR must be integer (precision = 0)
     
     order_value = quantity * price
     
+    print(f"📋 Min quantity from API: {min_quantity} BTC")
     print(f"💰 Price: ₹{price}")
     print(f"📊 Quantity: {quantity} BTC (2x minimum)")
     print(f"💵 Order value: ₹{order_value:.2f}")
