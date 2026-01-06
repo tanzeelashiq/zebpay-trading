@@ -91,7 +91,7 @@ def get_ticker_price(market: str):
 
 def place_market_buy_btcinr(amount_inr: int):
     """
-    Buy BTC with INR amount
+    Buy BTC - uses 2x minimum quantity
     Uses limit order at current price to ensure execution
     """
     # Get current price
@@ -99,18 +99,19 @@ def place_market_buy_btcinr(amount_inr: int):
     if not current_price:
         return 500, {"error": "Could not fetch price"}
     
-    # Calculate quantity (minimum 0.00001 BTC for BTCINR)
-    # Round to 6 decimals as per BTCINR precision
-    quantity = round(amount_inr / current_price, 6)
-    
-    # Ensure minimum quantity
-    if quantity < 0.00001:
-        quantity = 0.00001
+    # BTCINR minimum quantity is 0.00001 BTC
+    # We'll buy exactly 2x minimum = 0.00002 BTC
+    MIN_QUANTITY = 0.00001
+    quantity = MIN_QUANTITY * 2  # 0.00002 BTC
     
     # Use current price as limit (will execute immediately like market order)
-    price = int(current_price)  # INR must be integer
+    price = int(current_price)  # INR must be integer (precision = 0)
     
-    print(f"💰 Price: ₹{price}, Quantity: {quantity} BTC")
+    order_value = quantity * price
+    
+    print(f"💰 Price: ₹{price}")
+    print(f"📊 Quantity: {quantity} BTC (2x minimum)")
+    print(f"💵 Order value: ₹{order_value:.2f}")
     
     return place_order(
         market="BTCINR",
