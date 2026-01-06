@@ -49,7 +49,7 @@ def place_order(market: str, side: str, order_type: str, total_quantity: float, 
     """
     timeStamp = int(time.time() * 1000)
     
-    # Build body with required parameters in exact order from docs
+    # Build body with required parameters
     body = {
         "side": side,
         "order_type": order_type,
@@ -68,15 +68,14 @@ def place_order(market: str, side: str, order_type: str, total_quantity: float, 
     json_parts.append(',"order_type":"' + str(body["order_type"]) + '"')
     json_parts.append(',"market":"' + str(body["market"]) + '"')
     
+    if price_per_unit is not None:
+        json_parts.append(',"price_per_unit":' + str(body["price_per_unit"]))
+    
     # Format total_quantity without scientific notation
     qty_str = format(body["total_quantity"], '.10f').rstrip('0').rstrip('.')
     json_parts.append(',"total_quantity":' + qty_str)
     
     json_parts.append(',"timestamp":' + str(body["timestamp"]))
-    
-    if price_per_unit is not None:
-        json_parts.append(',"price_per_unit":' + str(body["price_per_unit"]))
-    
     json_parts.append('}')
     
     json_body = ''.join(json_parts)
