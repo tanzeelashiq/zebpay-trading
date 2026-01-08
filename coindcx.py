@@ -30,18 +30,24 @@ def place_order(market: str, side: str, order_type: str, total_quantity: float, 
     """
     timeStamp = int(round(time.time() * 1000))
     
-    # Build body exactly as shown in documentation
-    body = {
-        "side": side,
-        "order_type": order_type,
-        "market": market,
-        "price_per_unit": price_per_unit,
-        "total_quantity": total_quantity,
-        "timestamp": timeStamp,
-        "ecode": "I"  # Required for INR markets
-    }
+    # Format quantity to avoid scientific notation
+    # Convert to string with proper decimal format
+    if total_quantity < 1:
+        quantity_str = format(total_quantity, '.10f').rstrip('0').rstrip('.')
+    else:
+        quantity_str = str(total_quantity)
     
-    json_body = json.dumps(body, separators=(',', ':'))
+    # Build JSON manually to control float formatting
+    json_body = (
+        '{"side":"' + side + '",'
+        '"order_type":"' + order_type + '",'
+        '"market":"' + market + '",'
+        '"price_per_unit":' + str(int(price_per_unit)) + ','
+        '"total_quantity":' + quantity_str + ','
+        '"timestamp":' + str(timeStamp) + ','
+        '"ecode":"I"}'
+    )
+    
     signature = _sign(json_body)
     
     headers = {
@@ -102,7 +108,7 @@ def get_market_details(market: str):
 
 def place_market_buy_btcinr(amount_inr: int):
     """
-    Buy BTC - uses 10x minimum quantity from market details
+    Buy BTC - uses 2x minimum quantity from market details
     Uses limit order at current price to ensure execution
     """
     # Get market details
@@ -117,7 +123,7 @@ def place_market_buy_btcinr(amount_inr: int):
     if not current_price:
         return 500, {"error": "Could not fetch price"}
     
-    # Buy 10x minimum quantity
+    # Buy 2x minimum quantity
     quantity = min_quantity * 2
     
     # Price must be integer for INR (precision = 0)
@@ -126,7 +132,7 @@ def place_market_buy_btcinr(amount_inr: int):
     order_value = quantity * price
     
     print(f"💰 Price: ₹{price}")
-    print(f"📊 Quantity: {quantity} BTC (10x minimum)")
+    print(f"📊 Quantity: {quantity} BTC (2x minimum)")
     print(f"💵 Order value: ₹{order_value:.2f}")
     
     return place_order(
