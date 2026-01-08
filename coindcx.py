@@ -118,7 +118,7 @@ def place_market_buy_btcinr(amount_inr: int):
         return 500, {"error": "Could not fetch price"}
     
     # Buy 10x minimum quantity
-    quantity = min_quantity * 0.5
+    quantity = min_quantity * 2
     
     # Price must be integer for INR (precision = 0)
     price = int(current_price)
